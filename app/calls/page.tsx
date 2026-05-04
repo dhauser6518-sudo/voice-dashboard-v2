@@ -136,31 +136,39 @@ export default async function CallsPage({ searchParams }: { searchParams: Promis
               return (
                 <tr key={call.id} className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors">
                   <td className="px-4 py-3 font-mono text-xs text-gray-500">
-                    {format(new Date(call.start_time), 'MMM d, h:mm a')}
+                    <Link href={`/calls/${call.id}`} className="block">{format(new Date(call.start_time), 'MMM d, h:mm a')}</Link>
                   </td>
                   <td className="px-4 py-3">
-                    <Link href={`/calls/${call.id}`} className="text-gray-300 hover:text-cyan-400 font-medium text-xs">
-                      {call.leadName || '—'}
+                    <Link href={`/calls/${call.id}`} className="block text-cyan-400 hover:text-cyan-300 font-medium text-xs">
+                      {call.leadName || 'View call'}
                     </Link>
                   </td>
-                  <td className="px-4 py-3 text-xs text-gray-500">{call.agent_name || '—'}</td>
+                  <td className="px-4 py-3 text-xs text-gray-500">
+                    <Link href={`/calls/${call.id}`} className="block">{call.agent_name || '—'}</Link>
+                  </td>
                   <td className="px-4 py-3 font-mono text-xs text-gray-500">
-                    {formatPhone(call.telephony_params?.to || call.telephony_params?.from || '—')}
+                    <Link href={`/calls/${call.id}`} className="block">{formatPhone(call.telephony_params?.to || call.telephony_params?.from || '—')}</Link>
                   </td>
-                  <td className="px-4 py-3 font-mono text-xs text-gray-400">{formatDuration(call.duration)}</td>
-                  <td className="px-4 py-3">
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full ${
-                      call.telephony_params?.direction === 'inbound'
-                        ? 'bg-blue-500/20 text-blue-400'
-                        : 'bg-gray-700/50 text-gray-400'
-                    }`}>
-                      {call.telephony_params?.direction || '—'}
-                    </span>
+                  <td className="px-4 py-3 font-mono text-xs text-gray-400">
+                    <Link href={`/calls/${call.id}`} className="block">{formatDuration(call.duration)}</Link>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${dispInfo.color}`}>
-                      {dispInfo.label}
-                    </span>
+                    <Link href={`/calls/${call.id}`} className="block">
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+                        call.telephony_params?.direction === 'inbound'
+                          ? 'bg-blue-500/20 text-blue-400'
+                          : 'bg-gray-700/50 text-gray-400'
+                      }`}>
+                        {call.telephony_params?.direction || '—'}
+                      </span>
+                    </Link>
+                  </td>
+                  <td className="px-4 py-3">
+                    <Link href={`/calls/${call.id}`} className="block">
+                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${dispInfo.color}`}>
+                        {dispInfo.label}
+                      </span>
+                    </Link>
                   </td>
                 </tr>
               );
