@@ -4,14 +4,3 @@
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
-
-[[redirects]]
-  from = "/_next/static/*"
-  to = "/_next/static/:splat"
-  status = 200
-
-[[redirects]]
-  from = "/*"
-  to = "/.netlify/functions/___netlify-server-handler"
-  status = 200
-  force = true
