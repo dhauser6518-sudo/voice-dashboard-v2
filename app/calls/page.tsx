@@ -35,12 +35,28 @@ function classifyCall(call: { status: string; start_time: string; end_time?: str
   return 'connected';
 }
 
-export default async function CallsPage({ searchParams }: { searchParams: Promise<{ outcome?: string; page?: string }> }) {
+export default async function CallsPage({ searchParams }: { searchParams: Promise<{ outcome?: string; page?: string; range?: string }> }) {
   const params = await searchParams;
   const apiKey = await getCartesiaKey();
 
+  let since: string | undefined;
+  const range = params.range || '';
+  if (range === '5m') {
+    const d = new Date(); d.setMinutes(d.getMinutes() - 5);
+    since = d.toISOString();
+  } else if (range === '20m') {
+    const d = new Date(); d.setMinutes(d.getMinutes() - 20);
+    since = d.toISOString();
+  } else if (range === '1h') {
+    const d = new Date(); d.setHours(d.getHours() - 1);
+    since = d.toISOString();
+  } else if (range === 'today') {
+    const d = new Date(); d.setHours(d.getHours() - 24);
+    since = d.toISOString();
+  }
+
   let calls = apiKey
-    ? await fetchAllCartesiaCalls(apiKey, { limit: 500 })
+    ? await fetchAllCartesiaCalls(apiKey, { limit: 500, since })
     : [];
 
   // Classify each call
@@ -70,8 +86,22 @@ export default async function CallsPage({ searchParams }: { searchParams: Promis
     <div className="min-h-screen -m-8 p-8 bg-[#0B1120]">
       <h1 className="text-xl font-bold text-white mb-6">Calls</h1>
 
-      <div className="flex gap-2 mb-4 flex-wrap">
+      <div className="flex gap-2 mb-4 flex-wrap items-center">
+        <div className="flex items-center gap-1 mr-2">
+          {[{ value: '', label: 'All' }, { value: '5m', label: '5m' }, { value: '20m', label: '20m' }, { value: '1h', label: '1h' }, { value: 'today', label: 'Today' }].map(r => (
+            <Link
+              key={r.value}
+              href={`/calls?range=${r.value}${params.outcome ? `&outcome=${params.outcome}` : ''}`}
+              className={`px-2.5 py-1 text-xs rounded-lg transition-colors ${
+                range === r.value ? 'bg-cyan-600 text-white' : 'bg-[#111827] text-gray-400 hover:bg-gray-800'
+              }`}
+            >
+              {r.label}
+            </Link>
+          ))}
+        </div>
         <form className="flex gap-2 flex-wrap">
+          <input type="hidden" name="range" value={range} />
           <select name="outcome" defaultValue={params.outcome} className="px-3 py-1.5 text-sm bg-[#111827] border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-cyan-500">
             <option value="">All outcomes</option>
             <option value="sale">Sale</option>
@@ -81,7 +111,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Promis
             <option value="failed">Failed</option>
           </select>
           <button type="submit" className="px-3 py-1.5 text-sm bg-cyan-600 text-white rounded-lg hover:bg-cyan-500 transition-colors">Filter</button>
-          {params.outcome && (
+          {(params.outcome || range) && (
             <Link href="/calls" className="px-3 py-1.5 text-sm bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors">Clear</Link>
           )}
         </form>
@@ -145,7 +175,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Promis
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2 mt-4">
           {Array.from({ length: Math.min(totalPages, 10) }, (_, i) => i + 1).map(p => (
-            <Link key={p} href={`/calls?page=${p}${params.outcome ? `&outcome=${params.outcome}` : ''}`}
+            <Link key={p} href={`/calls?page=${p}${params.outcome ? `&outcome=${params.outcome}` : ''}${range ? `&range=${range}` : ''}`}
               className={`px-3 py-1 text-sm rounded ${p === page ? 'bg-cyan-600 text-white' : 'bg-[#111827] border border-gray-700 text-gray-400 hover:bg-gray-800'}`}>
               {p}
             </Link>

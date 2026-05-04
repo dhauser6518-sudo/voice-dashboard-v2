@@ -73,7 +73,7 @@ export default function HomePage() {
 
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-1">
-          {(['today', '7d', '30d', 'all'] as const).map(r => (
+          {(['5m', '20m', '1h', 'today', '7d', '30d', 'all'] as const).map(r => (
             <button
               key={r}
               onClick={() => setRange(r)}
@@ -81,7 +81,7 @@ export default function HomePage() {
                 range === r ? 'bg-cyan-600 text-white' : 'bg-[#111827] text-gray-400 hover:bg-gray-800'
               }`}
             >
-              {r === 'today' ? 'Today' : r === '7d' ? '7d' : r === '30d' ? '30d' : 'All'}
+              {r === '5m' ? '5m' : r === '20m' ? '20m' : r === '1h' ? '1h' : r === 'today' ? 'Today' : r === '7d' ? '7d' : r === '30d' ? '30d' : 'All'}
             </button>
           ))}
         </div>

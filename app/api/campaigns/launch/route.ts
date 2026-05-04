@@ -102,6 +102,28 @@ export async function POST(req: NextRequest) {
   let callsFailed = 0;
 
   for (const lead of leads) {
+    // Check if campaign was paused
+    const { data: check } = await supabase
+      .from('campaigns')
+      .select('status')
+      .eq('id', activeCampaignId)
+      .single();
+
+    if (check?.status === 'paused') {
+      await supabase
+        .from('campaigns')
+        .update({ calls_made: callsMade, calls_succeeded: callsSucceeded, calls_failed: callsFailed })
+        .eq('id', activeCampaignId);
+      return NextResponse.json({
+        ok: true,
+        campaign_id: activeCampaignId,
+        total: leads.length,
+        succeeded: callsSucceeded,
+        failed: callsFailed,
+        paused: true,
+      });
+    }
+
     // Clean phone to E.164
     const cleanPhone = (lead.phone || '').replace(/\D/g, '');
     if (cleanPhone.length < 10) {

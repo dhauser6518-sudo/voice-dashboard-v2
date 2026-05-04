@@ -16,7 +16,16 @@ export async function GET(request: NextRequest) {
   const direction = request.nextUrl.searchParams.get('direction') || '';
 
   let since: string | undefined;
-  if (range === 'today') {
+  if (range === '5m') {
+    const d = new Date(); d.setMinutes(d.getMinutes() - 5);
+    since = d.toISOString();
+  } else if (range === '20m') {
+    const d = new Date(); d.setMinutes(d.getMinutes() - 20);
+    since = d.toISOString();
+  } else if (range === '1h') {
+    const d = new Date(); d.setHours(d.getHours() - 1);
+    since = d.toISOString();
+  } else if (range === 'today') {
     const d = new Date(); d.setHours(d.getHours() - 24);
     since = d.toISOString();
   } else if (range === '7d') {

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Rocket, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, Rocket, CheckCircle, AlertCircle, Loader2, Play, Pause, RotateCcw } from 'lucide-react';
 
 type CartesiaBot = {
   id: string;
@@ -17,6 +17,20 @@ type LeadList = {
   created_at: string;
 };
 
+type Campaign = {
+  id: string;
+  name: string;
+  agent_id: string;
+  status: string;
+  total_leads: number;
+  calls_made: number;
+  calls_succeeded: number;
+  calls_failed: number;
+  created_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+};
+
 type LaunchResult = {
   ok: boolean;
   campaign_id?: string;
@@ -26,9 +40,17 @@ type LaunchResult = {
   error?: string;
 };
 
+const STATUS_STYLES: Record<string, { label: string; color: string }> = {
+  running: { label: 'Running', color: 'bg-emerald-500/20 text-emerald-400' },
+  paused: { label: 'Paused', color: 'bg-amber-500/20 text-amber-400' },
+  completed: { label: 'Completed', color: 'bg-blue-500/20 text-blue-400' },
+  draft: { label: 'Draft', color: 'bg-gray-700/50 text-gray-400' },
+};
+
 export default function CampaignPage() {
   const [bots, setBots] = useState<CartesiaBot[]>([]);
   const [lists, setLists] = useState<LeadList[]>([]);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [selectedBot, setSelectedBot] = useState('');
   const [selectedList, setSelectedList] = useState('');
   const [campaignName, setCampaignName] = useState('');
@@ -36,34 +58,65 @@ export default function CampaignPage() {
   const [result, setResult] = useState<LaunchResult | null>(null);
   const [loadingBots, setLoadingBots] = useState(true);
   const [loadingLists, setLoadingLists] = useState(true);
+  const [loadingCampaigns, setLoadingCampaigns] = useState(true);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   useEffect(() => {
-    async function fetchBots() {
-      try {
-        const res = await fetch('/api/bots');
-        const data = await res.json();
-        if (res.ok) setBots(data.bots || []);
-      } catch {} finally {
-        setLoadingBots(false);
-      }
-    }
-
-    async function fetchLists() {
-      try {
-        const res = await fetch('/api/lead-lists');
-        const data = await res.json();
-        if (res.ok) setLists(data.lists || []);
-      } catch {} finally {
-        setLoadingLists(false);
-      }
-    }
-
     fetchBots();
     fetchLists();
+    fetchCampaigns();
   }, []);
+
+  async function fetchBots() {
+    try {
+      const res = await fetch('/api/bots');
+      const data = await res.json();
+      if (res.ok) setBots(data.bots || []);
+    } catch {} finally {
+      setLoadingBots(false);
+    }
+  }
+
+  async function fetchLists() {
+    try {
+      const res = await fetch('/api/lead-lists');
+      const data = await res.json();
+      if (res.ok) setLists(data.lists || []);
+    } catch {} finally {
+      setLoadingLists(false);
+    }
+  }
+
+  async function fetchCampaigns() {
+    try {
+      const res = await fetch('/api/campaigns');
+      const data = await res.json();
+      if (res.ok) setCampaigns(data.campaigns || []);
+    } catch {} finally {
+      setLoadingCampaigns(false);
+    }
+  }
+
+  async function toggleCampaign(id: string, currentStatus: string) {
+    const newStatus = currentStatus === 'running' ? 'paused' : 'running';
+    setTogglingId(id);
+    try {
+      const res = await fetch('/api/campaigns/toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campaign_id: id, status: newStatus }),
+      });
+      if (res.ok) {
+        setCampaigns(prev => prev.map(c => c.id === id ? { ...c, status: newStatus } : c));
+      }
+    } catch {} finally {
+      setTogglingId(null);
+    }
+  }
 
   const selectedListObj = lists.find(l => l.id === selectedList);
   const leadCount = selectedListObj?.lead_count || 0;
+  const botMap = Object.fromEntries(bots.map(b => [b.id, b.name]));
 
   async function handleLaunch() {
     if (!selectedBot || !selectedList) return;
@@ -83,6 +136,7 @@ export default function CampaignPage() {
       const data = await res.json();
       if (res.ok) {
         setResult({ ok: true, ...data });
+        fetchCampaigns();
       } else {
         setResult({ ok: false, error: data.error || 'Failed to launch campaign' });
       }
@@ -93,43 +147,122 @@ export default function CampaignPage() {
     }
   }
 
-  if (result?.ok) {
-    return (
-      <div className="min-h-screen -m-8 p-8 bg-[#0B1120]">
-        <div className="max-w-lg mx-auto mt-20 text-center">
-          <CheckCircle size={48} className="text-emerald-400 mx-auto mb-4" />
-          <h2 className="text-lg font-bold text-white mb-2">Campaign Complete</h2>
-          <p className="text-sm text-gray-400 mb-1">{result.total} leads processed</p>
-          <div className="flex items-center justify-center gap-6 mt-4">
-            <div>
-              <div className="text-2xl font-bold text-emerald-400 font-mono">{result.succeeded}</div>
-              <div className="text-[10px] text-gray-600 uppercase">Succeeded</div>
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-red-400 font-mono">{result.failed}</div>
-              <div className="text-[10px] text-gray-600 uppercase">Failed</div>
-            </div>
-          </div>
-          <Link href="/" className="inline-block mt-6 px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg">
-            Back to Dashboard
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen -m-8 p-8 bg-[#0B1120]">
-      <div className="max-w-xl mx-auto">
+      <div className="max-w-4xl mx-auto">
         <Link href="/" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-300 mb-6">
           <ArrowLeft size={14} />
           Back to dashboard
         </Link>
 
-        <h1 className="text-xl font-bold text-white mb-6">Launch Campaign</h1>
+        <h1 className="text-xl font-bold text-white mb-6">Campaigns</h1>
+
+        {/* Campaign List */}
+        {!loadingCampaigns && campaigns.length > 0 && (
+          <div className="bg-[#111827] border border-gray-700/50 rounded-xl overflow-hidden mb-8">
+            <div className="px-4 py-3 border-b border-gray-700/50">
+              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">All Campaigns</h2>
+            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-[10px] text-gray-600 uppercase border-b border-gray-800/50">
+                  <th className="px-4 py-2">Name</th>
+                  <th className="px-4 py-2">Agent</th>
+                  <th className="px-4 py-2">Status</th>
+                  <th className="px-4 py-2">Progress</th>
+                  <th className="px-4 py-2">Created</th>
+                  <th className="px-4 py-2 text-right">Toggle</th>
+                </tr>
+              </thead>
+              <tbody>
+                {campaigns.map(c => {
+                  const style = STATUS_STYLES[c.status] || STATUS_STYLES.draft;
+                  const canToggle = c.status === 'running' || c.status === 'paused';
+                  const progress = c.total_leads > 0
+                    ? Math.round((c.calls_made / c.total_leads) * 100)
+                    : 0;
+                  return (
+                    <tr key={c.id} className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors">
+                      <td className="px-4 py-3 text-white text-xs font-medium">{c.name}</td>
+                      <td className="px-4 py-3 text-gray-500 text-xs">{botMap[c.agent_id] || c.agent_id.slice(0, 12)}</td>
+                      <td className="px-4 py-3">
+                        <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${style.color}`}>
+                          {style.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-20 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-cyan-500 rounded-full transition-all"
+                              style={{ width: `${progress}%` }}
+                            />
+                          </div>
+                          <span className="text-[10px] text-gray-500 font-mono">
+                            {c.calls_made}/{c.total_leads}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-gray-600 text-[10px] font-mono">
+                        {new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {canToggle ? (
+                          <button
+                            onClick={() => toggleCampaign(c.id, c.status)}
+                            disabled={togglingId === c.id}
+                            className={`inline-flex items-center gap-1.5 px-3 py-1 text-[10px] font-semibold rounded-lg transition-colors ${
+                              c.status === 'running'
+                                ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30'
+                                : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'
+                            } disabled:opacity-50`}
+                          >
+                            {togglingId === c.id ? (
+                              <Loader2 size={10} className="animate-spin" />
+                            ) : c.status === 'running' ? (
+                              <Pause size={10} />
+                            ) : (
+                              <Play size={10} />
+                            )}
+                            {c.status === 'running' ? 'Pause' : 'Resume'}
+                          </button>
+                        ) : c.status === 'completed' ? (
+                          <button
+                            onClick={() => toggleCampaign(c.id, 'paused')}
+                            disabled={togglingId === c.id}
+                            className="inline-flex items-center gap-1.5 px-3 py-1 text-[10px] font-semibold rounded-lg bg-gray-700/50 text-gray-400 hover:bg-gray-700 transition-colors disabled:opacity-50"
+                          >
+                            <RotateCcw size={10} />
+                            Restart
+                          </button>
+                        ) : null}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {loadingCampaigns && (
+          <div className="text-center py-8 mb-8">
+            <p className="text-gray-600 text-xs">Loading campaigns...</p>
+          </div>
+        )}
+
+        {/* Launch New Campaign */}
+        <h2 className="text-sm font-bold text-white mb-4">Launch New Campaign</h2>
+
+        {result?.ok && (
+          <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-center">
+            <CheckCircle size={32} className="text-emerald-400 mx-auto mb-2" />
+            <p className="text-sm font-semibold text-white">Campaign Complete</p>
+            <p className="text-xs text-gray-400 mt-1">{result.total} leads processed — {result.succeeded} succeeded, {result.failed} failed</p>
+          </div>
+        )}
 
         <div className="space-y-6">
-          {/* Select Bot */}
           <div className="bg-[#111827] border border-gray-700/50 rounded-xl p-5">
             <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">
               Select Agent (Cartesia Bot)
@@ -154,7 +287,6 @@ export default function CampaignPage() {
             )}
           </div>
 
-          {/* Select Lead List */}
           <div className="bg-[#111827] border border-gray-700/50 rounded-xl p-5">
             <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">
               Select Lead List
@@ -195,7 +327,6 @@ export default function CampaignPage() {
             )}
           </div>
 
-          {/* Campaign Name */}
           <div className="bg-[#111827] border border-gray-700/50 rounded-xl p-5">
             <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">
               Campaign Name (optional)
@@ -208,7 +339,6 @@ export default function CampaignPage() {
             />
           </div>
 
-          {/* Error display */}
           {result && !result.ok && (
             <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
               <AlertCircle size={14} className="text-red-400 shrink-0" />
@@ -216,7 +346,6 @@ export default function CampaignPage() {
             </div>
           )}
 
-          {/* Launch Button */}
           <button
             onClick={handleLaunch}
             disabled={launching || !selectedBot || !selectedList}
@@ -238,7 +367,7 @@ export default function CampaignPage() {
           {launching && (
             <div className="bg-[#111827] border border-gray-700/50 rounded-xl p-5 text-center">
               <p className="text-sm text-gray-400">Campaign is running server-side at ~1 call/second.</p>
-              <p className="text-xs text-gray-600 mt-1">This page will update when all calls are complete. Do not close this tab.</p>
+              <p className="text-xs text-gray-600 mt-1">This page will update when all calls are complete.</p>
             </div>
           )}
         </div>
