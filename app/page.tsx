@@ -6,12 +6,18 @@ import DashboardStats from '@/components/DashboardStats';
 import LiveFeed from '@/components/LiveFeed';
 import TestCallButton from '@/components/TestCallButton';
 
+type CartesiaPhoneNumber = {
+  id: string;
+  phone_number: string;
+  provider: { type: string };
+};
+
 type CartesiaBot = {
   id: string;
   name: string;
   is_live: boolean;
   tts_voice: string | null;
-  phoneNumbers: string[] | null;
+  phoneNumbers: CartesiaPhoneNumber[] | null;
   created_at: string;
   description?: string;
   git_deploy_branch?: string;
@@ -101,7 +107,7 @@ export default function HomePage() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
           {bots.map((bot) => {
-            const phoneNumber = bot.phoneNumbers?.[0] || null;
+            const phoneNumber = bot.phoneNumbers?.[0]?.phone_number || null;
             return (
               <div
                 key={bot.id}

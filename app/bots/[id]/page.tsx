@@ -12,12 +12,18 @@ type Deployment = {
   created_at?: string;
 };
 
+type CartesiaPhoneNumber = {
+  id: string;
+  phone_number: string;
+  provider: { type: string };
+};
+
 type CartesiaAgent = {
   id: string;
   name: string;
   is_live: boolean;
   tts_voice: string | null;
-  phoneNumbers: string[] | null;
+  phoneNumbers: CartesiaPhoneNumber[] | null;
   created_at: string;
   description?: string;
   git_deploy_branch?: string;
@@ -75,7 +81,7 @@ export default function BotDetailPage() {
     );
   }
 
-  const phoneNumber = bot.phoneNumbers?.[0] || null;
+  const phoneNumber = bot.phoneNumbers?.[0]?.phone_number || null;
   const deployments = bot.pinned_version?.deployments || [];
 
   return (
@@ -162,7 +168,7 @@ export default function BotDetailPage() {
           <div className="flex flex-wrap gap-2">
             {bot.phoneNumbers.map((num, i) => (
               <span key={i} className="px-3 py-1 bg-[#0B1120] border border-gray-700 rounded-lg text-sm text-gray-300 font-mono">
-                {num}
+                {num.phone_number}
               </span>
             ))}
           </div>
