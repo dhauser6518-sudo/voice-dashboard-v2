@@ -1,64 +1,81 @@
-import { createServerClient } from '@/lib/supabase/server';
+import { getCartesiaKey, fetchAllCartesiaCalls } from '@/lib/cartesia';
 import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
-  const supabase = createServerClient();
+  const apiKey = await getCartesiaKey();
+  if (!apiKey) {
+    return NextResponse.json({
+      activeBots: 0, totalBots: 0, activeCalls: 0, totalCalls: 0,
+      pickups: 0, voicemails: 0, totalSales: 0, totalPremium: 0,
+    });
+  }
+
   const range = request.nextUrl.searchParams.get('range') || 'today';
 
-  let since: string | null = null;
-  if (range === 'today') { const d = new Date(); d.setHours(-5, 0, 0, 0); since = d.toISOString(); } // EST offset
-  else if (range === '7d') { const d = new Date(); d.setDate(d.getDate() - 7); since = d.toISOString(); }
-  else if (range === '30d') { const d = new Date(); d.setDate(d.getDate() - 30); since = d.toISOString(); }
+  let since: string | undefined;
+  if (range === 'today') {
+    const d = new Date(); d.setHours(d.getHours() - 24);
+    since = d.toISOString();
+  } else if (range === '7d') {
+    const d = new Date(); d.setDate(d.getDate() - 7);
+    since = d.toISOString();
+  } else if (range === '30d') {
+    const d = new Date(); d.setDate(d.getDate() - 30);
+    since = d.toISOString();
+  }
 
-  // PostgREST caps row-returning selects at 1000 rows. Use head:true count queries
-  // per metric so totals are accurate past 1000 calls. Sales rows are fetched (no
-  // count) because we need application_data for premium math, but sale count is tiny.
-  const withSince = <T extends { gte: (col: string, val: string) => T }>(q: T): T =>
-    since ? q.gte('started_at', since) : q;
+  // Fetch agents
+  const agentsRes = await fetch('https://api.cartesia.ai/agents', {
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Cartesia-Version': '2025-04-16',
+    },
+  });
+  const agentsBody = agentsRes.ok ? await agentsRes.json() : { summaries: [] };
+  const agents = agentsBody.summaries || [];
+  const totalBots = agents.length;
+  const activeBots = agents.filter((a: { is_live?: boolean }) => a.is_live).length;
 
-  const [
-    activeBotsRes,
-    totalBotsRes,
-    totalCallsRes,
-    pickupsRes,
-    voicemailsRes,
-    salesRes,
-    activeCallsRes,
-  ] = await Promise.all([
-    supabase.from('voice_agents').select('id', { count: 'exact', head: true }).eq('is_active', true),
-    supabase.from('voice_agents').select('id', { count: 'exact', head: true }),
-    withSince(supabase.from('voice_call_logs').select('id', { count: 'exact', head: true })),
-    withSince(supabase.from('voice_call_logs').select('id', { count: 'exact', head: true }).not('outcome', 'in', '("voicemail","no_answer")')),
-    withSince(supabase.from('voice_call_logs').select('id', { count: 'exact', head: true }).eq('outcome', 'voicemail')),
-    withSince(supabase.from('voice_call_logs').select('application_data').eq('outcome', 'sale')),
-    supabase.from('voice_call_logs').select('id', { count: 'exact', head: true }).eq('status', 'in_progress'),
-  ]);
+  // Fetch calls from all agents
+  const allCalls = await fetchAllCartesiaCalls(apiKey, { since, limit: 1000 });
 
-  const activeBots = activeBotsRes.count;
-  const totalBots = totalBotsRes.count;
-  const totalCalls = totalCallsRes.count || 0;
-  const pickups = pickupsRes.count || 0;
-  const voicemails = voicemailsRes.count || 0;
-  const activeCalls = activeCallsRes.count;
-  const sales = salesRes.data || [];
-  const totalSales = sales.length;
+  const totalCalls = allCalls.length;
+  const activeCalls = allCalls.filter(c => c.status === 'started').length;
+  const completed = allCalls.filter(c => c.status === 'completed');
+  const pickups = completed.filter(c => {
+    const duration = c.end_time && c.start_time
+      ? (new Date(c.end_time).getTime() - new Date(c.start_time).getTime()) / 1000
+      : 0;
+    return duration > 10;
+  }).length;
+  const voicemails = completed.filter(c => {
+    const duration = c.end_time && c.start_time
+      ? (new Date(c.end_time).getTime() - new Date(c.start_time).getTime()) / 1000
+      : 0;
+    return duration <= 10 && c.end_reason !== 'error';
+  }).length;
 
+  // Check for sales in transcript tool calls
+  let totalSales = 0;
   let totalPremium = 0;
-  for (const sale of sales) {
-    const mp = Number((sale.application_data as { premium_quoted?: number } | null)?.premium_quoted);
-    if (!isNaN(mp) && mp > 0) totalPremium += mp * 12;
+  for (const call of completed) {
+    if (!call.transcript) continue;
+    for (const turn of call.transcript) {
+      if (!turn.tool_calls) continue;
+      for (const tc of turn.tool_calls) {
+        if (tc.name === 'record_sale') {
+          totalSales++;
+          const premium = Number(tc.arguments?.monthly_premium);
+          if (!isNaN(premium) && premium > 0) totalPremium += premium * 12;
+        }
+      }
+    }
   }
 
   return NextResponse.json({
-    activeBots: activeBots || 0,
-    totalBots: totalBots || 0,
-    activeCalls: activeCalls || 0,
-    totalCalls,
-    pickups,
-    voicemails,
-    totalSales,
-    totalPremium: Math.round(totalPremium),
+    activeBots, totalBots, activeCalls, totalCalls,
+    pickups, voicemails, totalSales, totalPremium: Math.round(totalPremium),
   });
 }
