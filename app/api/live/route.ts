@@ -1,15 +1,19 @@
 import { getCartesiaKey, fetchCartesiaCalls } from '@/lib/cartesia';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const apiKey = await getCartesiaKey();
   if (!apiKey) {
     return NextResponse.json({ active: [], recent: [] });
   }
 
-  const { calls } = await fetchCartesiaCalls(apiKey, { limit: 30 });
+  const direction = request.nextUrl.searchParams.get('direction') || '';
+  let { calls } = await fetchCartesiaCalls(apiKey, { limit: 30 });
+  if (direction === 'inbound' || direction === 'outbound') {
+    calls = calls.filter(c => c.telephony_params?.direction === direction);
+  }
 
   const active = calls
     .filter(c => c.status === 'started')

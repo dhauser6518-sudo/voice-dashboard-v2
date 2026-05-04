@@ -27,7 +27,7 @@ function timeAgo(dateStr: string): string {
   return `${Math.floor(diff / 3600)}h ago`;
 }
 
-export default function LiveFeed() {
+export default function LiveFeed({ direction = 'all' }: { direction?: string }) {
   const [active, setActive] = useState<ActiveCall[]>([]);
   const [recent, setRecent] = useState<RecentCall[]>([]);
   const [, setTick] = useState(0);
@@ -36,7 +36,8 @@ export default function LiveFeed() {
     let mounted = true;
     async function poll() {
       try {
-        const res = await fetch('/api/live');
+        const dirParam = direction !== 'all' ? `?direction=${direction}` : '';
+        const res = await fetch(`/api/live${dirParam}`);
         if (res.ok && mounted) {
           const data = await res.json();
           setActive(data.active || []);
@@ -47,7 +48,7 @@ export default function LiveFeed() {
     poll();
     const interval = setInterval(() => { poll(); setTick(t => t + 1); }, 5000);
     return () => { mounted = false; clearInterval(interval); };
-  }, []);
+  }, [direction]);
 
   useEffect(() => {
     if (active.length === 0) return;

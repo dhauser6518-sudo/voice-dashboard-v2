@@ -13,21 +13,22 @@ type Stats = {
   totalPremium: number;
 };
 
-export default function DashboardStats({ range }: { range: string }) {
+export default function DashboardStats({ range, direction = 'all' }: { range: string; direction?: string }) {
   const [stats, setStats] = useState<Stats | null>(null);
 
   useEffect(() => {
     let mounted = true;
     async function poll() {
       try {
-        const res = await fetch(`/api/stats?range=${range}`);
+        const dirParam = direction !== 'all' ? `&direction=${direction}` : '';
+        const res = await fetch(`/api/stats?range=${range}${dirParam}`);
         if (res.ok && mounted) setStats(await res.json());
       } catch {}
     }
     poll();
     const interval = setInterval(poll, 5000);
     return () => { mounted = false; clearInterval(interval); };
-  }, [range]);
+  }, [range, direction]);
 
   if (!stats) return null;
 

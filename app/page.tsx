@@ -28,6 +28,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [range, setRange] = useState('today');
+  const [direction, setDirection] = useState<'all' | 'inbound' | 'outbound'>('all');
 
   useEffect(() => {
     async function fetchBots() {
@@ -70,24 +71,39 @@ export default function HomePage() {
         </Link>
       </div>
 
-      <div className="flex items-center gap-1 mb-6">
-        {(['today', '7d', '30d', 'all'] as const).map(r => (
-          <button
-            key={r}
-            onClick={() => setRange(r)}
-            className={`px-2.5 py-1 text-xs rounded-lg transition-colors ${
-              range === r ? 'bg-cyan-600 text-white' : 'bg-[#111827] text-gray-400 hover:bg-gray-800'
-            }`}
-          >
-            {r === 'today' ? 'Today' : r === '7d' ? '7d' : r === '30d' ? '30d' : 'All'}
-          </button>
-        ))}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-1">
+          {(['today', '7d', '30d', 'all'] as const).map(r => (
+            <button
+              key={r}
+              onClick={() => setRange(r)}
+              className={`px-2.5 py-1 text-xs rounded-lg transition-colors ${
+                range === r ? 'bg-cyan-600 text-white' : 'bg-[#111827] text-gray-400 hover:bg-gray-800'
+              }`}
+            >
+              {r === 'today' ? 'Today' : r === '7d' ? '7d' : r === '30d' ? '30d' : 'All'}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-1">
+          {(['all', 'inbound', 'outbound'] as const).map(d => (
+            <button
+              key={d}
+              onClick={() => setDirection(d)}
+              className={`px-2.5 py-1 text-xs rounded-lg transition-colors ${
+                direction === d ? 'bg-cyan-600 text-white' : 'bg-[#111827] text-gray-400 hover:bg-gray-800'
+              }`}
+            >
+              {d === 'all' ? 'All Calls' : d === 'inbound' ? 'Inbound' : 'Outbound'}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <DashboardStats range={range} />
+      <DashboardStats range={range} direction={direction} />
 
       <div className="mb-6">
-        <LiveFeed />
+        <LiveFeed direction={direction} />
       </div>
 
       {loading ? (

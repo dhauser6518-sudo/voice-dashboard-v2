@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
   }
 
   const range = request.nextUrl.searchParams.get('range') || 'today';
+  const direction = request.nextUrl.searchParams.get('direction') || '';
 
   let since: string | undefined;
   if (range === 'today') {
@@ -38,8 +39,11 @@ export async function GET(request: NextRequest) {
   const totalBots = agents.length;
   const activeBots = agents.filter((a: { is_live?: boolean }) => a.is_live).length;
 
-  // Fetch calls from all agents
-  const allCalls = await fetchAllCartesiaCalls(apiKey, { since, limit: 1000 });
+  // Fetch calls from all agents, filter by direction if specified
+  let allCalls = await fetchAllCartesiaCalls(apiKey, { since, limit: 1000 });
+  if (direction === 'inbound' || direction === 'outbound') {
+    allCalls = allCalls.filter(c => c.telephony_params?.direction === direction);
+  }
 
   const totalCalls = allCalls.length;
   const activeCalls = allCalls.filter(c => c.status === 'started').length;
